@@ -118,6 +118,53 @@ F7
 
 ---
 
+## CMD 0x23 — Set Key Lamps (Teaching Mode)
+
+Same wire format as CMD 0x20, but saves lamp assignments for **teaching mode**:
+a configured key lights up only while held and turns off on release. Use this for
+lesson recording / guided play, where each key should light on press and go dark on
+release. Keys not listed in the message are left unmodified.
+
+### Format
+
+```
+F0 03 23 [numPairs] [lampID paletteSlot] × N F7
+```
+
+| Byte | Value | Description |
+|------|-------|-------------|
+| `F0` | — | SysEx start |
+| `03` | — | Manufacturer ID |
+| `23` | — | Command: Set Key Lamps (Teaching Mode) |
+| `[numPairs]` | 1–29 | Number of key–slot pairs |
+| `[lampID]` | 0–28 | Key index (0 = C3, 28 = E5) |
+| `[paletteSlot]` | 0–127 | Palette slot (0 = off) |
+| `F7` | — | SysEx end |
+
+### Example — single key
+
+```
+F0 03 23 01 00 03 F7   ← key 0 (C3) saved to palette slot 3; other keys unchanged
+```
+
+### Example — set all 29 keys to palette slot 5
+
+```
+F0 03 23 1D
+   00 05   ← key 0  (C3)  → slot 5
+   01 05   ← key 1  (C#3) → slot 5
+   02 05   ← key 2  (D3)  → slot 5
+   ...
+   1C 05   ← key 28 (E5)  → slot 5
+F7
+```
+
+> Unlike CMD 0x20, CMD 0x23 does **not** light keys immediately — each configured
+> key lights only while physically held. To turn a teaching-mode key off permanently,
+> assign it slot 0.
+
+---
+
 ## Typical Flow
 
 ```
