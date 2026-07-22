@@ -34,7 +34,7 @@ This switches the firmware into LED-control mode.
 
 ### 2-b. Clear all lights (optional but recommended)
 
-Send a CMD 15 message that sets all 36 keys to black — see Section 3 for the format.
+Send a CMD 15 message that sets all 36 keys to black — see Section 4 for the format.
 This ensures a clean known state after reconnect:
 
 ```
@@ -50,7 +50,54 @@ F7
 
 ---
 
-## 3. CMD 15 — Per-key RGB color (primary command)
+## 3. CMD 14 (0x14) — Per-key palette color
+
+Sets individual keys to firmware-defined palette colors. Unlike CMD 71, this
+command addresses keys by their zero-based key index rather than MIDI note.
+
+### Frame structure
+
+```
+F0 05 30 7F 7F 20 00 14  <numKeys>
+  <keyIndex_0>  <paletteIndex_0>
+  <keyIndex_1>  <paletteIndex_1>
+  …
+F7
+```
+
+| Byte(s) | Value | Description |
+|---------|-------|-------------|
+| `F0` | — | SysEx start |
+| `05 30 7F 7F 20 00` | — | Manufacturer / device header |
+| `14` | 20 decimal | Command ID |
+| `numKeys` | 0–36 | Number of key/palette pairs; `0` turns all lights off |
+| `keyIndex` | 0–35 | Key index (`0` = leftmost key) |
+| `paletteIndex` | 0–12 | Firmware-defined palette color |
+| `F7` | — | SysEx end |
+
+### Palette colors
+
+CMD 14 uses the same 13 palette slots as CMD 71:
+
+| Palette index | Color |
+|---------------|-------|
+| 0 | Off |
+| 1 | Red |
+| 2–11 | Orange → Cyan → Blue |
+| 12 | Purple |
+
+### Example — set key 0 red, key 12 blue
+
+```
+F0 05 30 7F 7F 20 00 14 02
+  00 01
+  0C 08
+F7
+```
+
+---
+
+## 4. CMD 15 — Per-key RGB color (primary command)
 
 This is the main command for setting arbitrary colors on individual keys.
 
@@ -154,7 +201,7 @@ This keeps messages small — typically 1–2 groups per chord change.
 
 ---
 
-## 4. CMD 113 (0x71) — All lights off
+## 5. CMD 113 (0x71) — All lights off
 
 Dedicated command to extinguish all LEDs immediately:
 
@@ -164,7 +211,7 @@ F0 05 30 7F 7F 20 00 71 00 F7
 
 ---
 
-## 5. CMD 113 (0x71) — Palette mode (alternative)
+## 6. CMD 113 (0x71) — Palette mode (alternative)
 
 Sets keys to firmware-defined palette colors (13 slots):
 
@@ -185,13 +232,13 @@ F7
 
 `midiNote` = key index + 48 (keyboard starts at MIDI 48 = C3).
 
-> Note: palette mode and CMD 15 RGB mode share the same command byte (`0x71`).
+> Note: all-off and palette mode share the same command byte (`0x71`).
 > The firmware distinguishes them by content: `numKeys = 0` with no pairs = all-off;
 > `numKeys > 0` with note/palette pairs = palette mode.
 
 ---
 
-## 6. Note-on LED (legacy, avoid in new code)
+## 7. Note-on LED (legacy, avoid in new code)
 
 The firmware also accepts standard MIDI note-on messages to light keys.
 **Always use velocity = 64 (`0x40`) on channel 0:**
@@ -223,11 +270,11 @@ function onMIDI(msg) {
 }
 ```
 
-**Prefer CMD 15 (Section 3) over note-on LEDs** — CMD 15 does not echo.
+**Prefer CMD 15 (Section 4) over note-on LEDs** — CMD 15 does not echo.
 
 ---
 
-## 7. Key layout
+## 8. Key layout
 
 ```
 Key index:  0  1  2  3  4  5  6  7  8  9  10 11 12 ... 35
@@ -241,7 +288,7 @@ Note name: C3 C#3 D3 D#3 E3 F3 F#3 G3 G#3 A3 A#3 B3 C4 ... B5
 
 ---
 
-## 8. Precise timing (Web MIDI)
+## 9. Precise timing (Web MIDI)
 
 `outputPort.send(data, domTimestamp)` schedules the message to fire at a specific
 `performance.now()` timestamp, bypassing JS event-loop jitter:
@@ -257,7 +304,7 @@ To cancel pre-scheduled messages (e.g. on Stop): `outputPort.clear()`.
 
 ---
 
-## 9. Hardware latency note
+## 10. Hardware latency note
 
 Physical LED changes lag behind the moment the firmware receives the MIDI message by
 approximately **150–250 ms** (varies by unit). When synchronising to audio:
@@ -268,7 +315,7 @@ approximately **150–250 ms** (varies by unit). When synchronising to audio:
 
 ---
 
-## 10. Page-level hooks (PartyKeys web runtime)
+## 11. Page-level hooks (PartyKeys web runtime)
 
 If you build on top of `audio.js`, two `window` hooks are available:
 
@@ -302,6 +349,7 @@ window._pkMidiHook = function(msg) {
 |------|---------|
 | Enter LED mode (required first) | `F0 05 30 7F 7F 20 00 0F 01 F7` |
 | All lights off | `F0 05 30 7F 7F 20 00 71 00 F7` |
+| Set palette colors by key index | CMD 14: `F0 05 30 7F 7F 20 00 14 <N> <index pal>× F7` |
 | Set per-key RGB colors | CMD 15: `F0 05 30 7F 7F 20 00 15 <groups> F7` |
 | Set palette colors | CMD 71: `F0 05 30 7F 7F 20 00 71 <N> <note pal>× F7` |
 | Light single key (legacy) | Note-on ch0 vel=64; suppress echo |
